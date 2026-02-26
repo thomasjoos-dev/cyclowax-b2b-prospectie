@@ -29,6 +29,23 @@ new class extends Component
     }
 
     #[Computed]
+    public function statusCounts(): array
+    {
+        $counts = Store::query()
+            ->when($this->search, fn ($q) => $q->where('name', 'like', "%{$this->search}%"))
+            ->selectRaw('pipeline_status, count(*) as total')
+            ->groupBy('pipeline_status')
+            ->pluck('total', 'pipeline_status')
+            ->toArray();
+
+        return array_merge(
+            ['all' => array_sum($counts)],
+            array_fill_keys(array_keys(Store::$statusLabels), 0),
+            $counts,
+        );
+    }
+
+    #[Computed]
     public function stores()
     {
         return Store::query()
