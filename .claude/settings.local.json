@@ -3,7 +3,12 @@
     "allow": [
       "Bash(php artisan make:controller StoreController --no-interaction 2>&1)",
       "Bash(git -C /Users/gladiator-macbookair/Herd/Bike-Store-Locator status)",
-      "Bash(php artisan make:class Services/StoreImportService --no-interaction 2>&1)"
+      "Bash(php artisan make:class Services/StoreImportService --no-interaction 2>&1)",
+      "mcp__laravel-boost__search-docs",
+      "Bash(php artisan make:livewire StoreList --mfc --no-interaction 2>&1)",
+      "Bash(find /Users/gladiator-macbookair/Herd/Bike-Store-Locator -path \"*/Livewire/StoreList*\" -o -path \"*/livewire/store-list*\" 2>/dev/null | sort)",
+      "Bash(vendor/bin/pint --dirty --format agent 2>&1)",
+      "mcp__laravel-boost__get-absolute-url"
     ]
   },
   "enableAllProjectMcpServers": true,
