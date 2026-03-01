@@ -11,6 +11,8 @@ class OverpassService
 
     private const RATE_LIMIT_SECONDS = 1;
 
+    private const REGION_RATE_LIMIT_SECONDS = 3;
+
     private static float $lastRequestAt = 0.0;
 
     /**
@@ -20,7 +22,7 @@ class OverpassService
      */
     public function fetchBicycleShops(string $city): array
     {
-        $this->respectRateLimit();
+        $this->respectRateLimit(self::RATE_LIMIT_SECONDS);
 
         $query = $this->buildQuery($city);
 
@@ -38,6 +40,44 @@ class OverpassService
         }
 
         return $this->parseElements($response->json('elements', []));
+    }
+
+    /**
+     * Fetch bicycle shops from Overpass API for a given region (e.g. Bundesland).
+     *
+     * @return array<int, array{name: string, address: string|null, city: string|null, country: string|null, postal_code: string|null, phone: string|null, website: string|null, latitude: float|null, longitude: float|null}>
+     */
+    public function fetchBicycleShopsInRegion(string $region, int $adminLevel = 4): array
+    {
+        $this->respectRateLimit(self::REGION_RATE_LIMIT_SECONDS);
+
+        $query = $this->buildRegionQuery($region, $adminLevel);
+
+        $response = Http::timeout(90)
+            ->asForm()
+            ->post(self::ENDPOINT, ['data' => $query]);
+
+        if ($response->failed()) {
+            Log::error('Overpass API region request failed', [
+                'region' => $region,
+                'admin_level' => $adminLevel,
+                'status' => $response->status(),
+            ]);
+
+            return [];
+        }
+
+        return $this->parseElements($response->json('elements', []));
+    }
+
+    private function buildRegionQuery(string $region, int $adminLevel): string
+    {
+        return <<<OVERPASS
+        [out:json][timeout:90];
+        area["name"="{$region}"]["admin_level"="{$adminLevel}"]->.searchArea;
+        nwr["shop"="bicycle"](area.searchArea);
+        out center tags;
+        OVERPASS;
     }
 
     private function buildQuery(string $city): string
@@ -105,13 +145,13 @@ class OverpassService
         return [null, null];
     }
 
-    private function respectRateLimit(): void
+    private function respectRateLimit(int $seconds = self::RATE_LIMIT_SECONDS): void
     {
         $now = microtime(true);
         $elapsed = $now - self::$lastRequestAt;
 
-        if (self::$lastRequestAt > 0 && $elapsed < self::RATE_LIMIT_SECONDS) {
-            usleep((int) ((self::RATE_LIMIT_SECONDS - $elapsed) * 1_000_000));
+        if (self::$lastRequestAt > 0 && $elapsed < $seconds) {
+            usleep((int) (($seconds - $elapsed) * 1_000_000));
         }
 
         self::$lastRequestAt = microtime(true);
