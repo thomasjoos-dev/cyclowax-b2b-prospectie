@@ -10,15 +10,25 @@ class StoreImportService
      * Import stores from a normalized data array.
      *
      * @param  array<int, array<string, mixed>>  $stores
-     * @return array{found: int, created: int, duplicates: int}
+     * @return array{found: int, created: int, duplicates: int, updated: int}
      */
-    public function import(array $stores): array
+    public function import(array $stores, ?string $fallbackCity = null): array
     {
         $created = 0;
         $duplicates = 0;
+        $updated = 0;
 
         foreach ($stores as $data) {
-            if ($this->isDuplicate($data['name'], $data['postal_code'] ?? null)) {
+            $city = $data['city'] ?? $fallbackCity;
+
+            $existing = $this->findDuplicate($data['name'], $data['postal_code'] ?? null);
+
+            if ($existing) {
+                if (! $existing->city && $city) {
+                    $existing->update(['city' => $city]);
+                    $updated++;
+                }
+
                 $duplicates++;
 
                 continue;
@@ -27,7 +37,7 @@ class StoreImportService
             Store::query()->create([
                 'name' => $data['name'],
                 'address' => $data['address'] ?? null,
-                'city' => $data['city'] ?? null,
+                'city' => $city,
                 'country' => $data['country'] ?? null,
                 'postal_code' => $data['postal_code'] ?? null,
                 'phone' => $data['phone'] ?? null,
@@ -47,14 +57,15 @@ class StoreImportService
             'found' => count($stores),
             'created' => $created,
             'duplicates' => $duplicates,
+            'updated' => $updated,
         ];
     }
 
-    private function isDuplicate(string $name, ?string $postalCode): bool
+    private function findDuplicate(string $name, ?string $postalCode): ?Store
     {
         return Store::query()
             ->where('name', $name)
             ->where('postal_code', $postalCode)
-            ->exists();
+            ->first();
     }
 }

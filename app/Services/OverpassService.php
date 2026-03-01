@@ -44,7 +44,7 @@ class OverpassService
     {
         return <<<OVERPASS
         [out:json][timeout:25];
-        area["name"="{$city}"]->.searchArea;
+        area["name"="{$city}"]["admin_level"]->.searchArea;
         nwr["shop"="bicycle"](area.searchArea);
         out center tags;
         OVERPASS;
