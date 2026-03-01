@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "mcp__laravel-boost__search-docs",
+      "mcp__laravel-boost__database-schema",
+      "mcp__laravel-boost__database-query",
+      "mcp__laravel-boost__list-routes",
+      "mcp__laravel-boost__list-artisan-commands",
+      "mcp__laravel-boost__get-absolute-url",
+      "mcp__laravel-boost__application-info",
+      "mcp__laravel-boost__tinker",
+      "mcp__laravel-boost__last-error",
+      "mcp__laravel-boost__read-log-entries",
+      "mcp__laravel-boost__browser-logs",
+      "Bash(vendor/bin/pint *)",
+      "Bash(php artisan *)",
+      "Bash(npm run *)"
+    ]
+  }
+}
