@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Store extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'name',
         'address',
@@ -21,6 +24,8 @@ class Store extends Model
         'is_existing_customer',
         'discovery_source',
         'notes',
+        'last_contacted_at',
+        'assigned_to',
     ];
 
     protected function casts(): array
@@ -29,6 +34,7 @@ class Store extends Model
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
             'is_existing_customer' => 'boolean',
+            'last_contacted_at' => 'datetime',
         ];
     }
 

@@ -6,7 +6,61 @@
 @source '../**/*.blade.php';
 @source '../**/*.js';
 
+/* maryUI component classes */
+@source "../../vendor/robsontenorio/mary/src/View/Components/**/*.php";
+
 @theme {
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+/* daisyUI base */
+@plugin "daisyui";
+
+/* daisyUI - Cyclowax custom theme */
+@plugin "daisyui/theme" {
+    name: "light";
+    default: false;
+    prefersdark: false;
+    color-scheme: "light";
+    --color-base-100: oklch(98% 0.002 247.839);
+    --color-base-200: oklch(96% 0.003 264.542);
+    --color-base-300: oklch(92% 0.006 264.531);
+    --color-base-content: oklch(21% 0.034 264.665);
+    --color-primary: oklch(21% 0.034 264.665);
+    --color-primary-content: oklch(96% 0.003 264.542);
+    --color-secondary: oklch(62% 0.265 303.9);
+    --color-secondary-content: oklch(97% 0.014 308.299);
+    --color-accent: oklch(21% 0.034 264.665);
+    --color-accent-content: oklch(96% 0.003 264.542);
+    --color-neutral: oklch(21% 0.034 264.665);
+    --color-neutral-content: oklch(96% 0.003 264.542);
+    --color-info: oklch(21% 0.034 264.665);
+    --color-info-content: oklch(96% 0.003 264.542);
+    --color-success: oklch(76% 0.177 163.223);
+    --color-success-content: oklch(97% 0.021 166.113);
+    --color-warning: oklch(64% 0.246 16.439);
+    --color-warning-content: oklch(98% 0.022 95.277);
+    --color-error: oklch(64% 0.246 16.439);
+    --color-error-content: oklch(96% 0.015 12.422);
+    --radius-selector: 2rem;
+    --radius-field: 1rem;
+    --radius-box: 0rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 1px;
+    --depth: 1;
+    --noise: 1;
+}
+
+/* Theme toggle support */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Paginator styling voor Mary UI tables */
+.mary-table-pagination span[aria-current="page"] > span {
+    @apply bg-primary text-base-100;
+}
+
+.mary-table-pagination button {
+    @apply cursor-pointer;
 }
