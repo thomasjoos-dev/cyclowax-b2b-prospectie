@@ -122,6 +122,7 @@ class OverpassService
                 'website' => $tags['website'] ?? $tags['contact:website'] ?? null,
                 'latitude' => $lat,
                 'longitude' => $lon,
+                'has_workshop' => ($tags['service:bicycle:repair'] ?? null) === 'yes',
             ];
         }
 

@@ -1,20 +1,15 @@
 @php
-    use App\Models\Store;
+    use App\Enums\PipelineStatus;
 
-    $statusOptions = collect(Store::$statusLabels)->map(fn ($label, $value) => [
-        'id' => $value,
-        'name' => $label,
-    ])->values()->toArray();
+    $statusOptions = collect(PipelineStatus::cases())->map(fn (PipelineStatus $s) => [
+        'id' => $s->value,
+        'name' => $s->label(),
+    ])->toArray();
 
-    $filterTabs = array_merge(['all' => 'Alle'], Store::$statusLabels);
-
-    $badgeClasses = [
-        'niet_gecontacteerd' => 'badge-neutral badge-soft',
-        'gecontacteerd'      => 'badge-info badge-soft',
-        'in_gesprek'         => 'badge-warning badge-soft',
-        'partner'            => 'badge-success badge-soft',
-        'afgewezen'          => 'badge-error badge-soft',
-    ];
+    $filterTabs = array_merge(
+        ['all' => 'Alle'],
+        collect(PipelineStatus::cases())->mapWithKeys(fn (PipelineStatus $s) => [$s->value => $s->label()])->toArray(),
+    );
 
     $contactFilterOptions = [
         ['id' => '', 'name' => 'Alle contactinfo'],
@@ -190,17 +185,11 @@
                 <select
                     wire:change="updateStatus({{ $store->id }}, $event.target.value)"
                     wire:click.stop
-                    class="select select-xs select-bordered rounded-full font-medium {{ [
-                        'niet_gecontacteerd' => 'badge-neutral badge-soft',
-                        'gecontacteerd'      => 'badge-info badge-soft',
-                        'in_gesprek'         => 'badge-warning badge-soft',
-                        'partner'            => 'badge-success badge-soft',
-                        'afgewezen'          => 'badge-error badge-soft',
-                    ][$store->pipeline_status] ?? '' }}"
+                    class="select select-xs select-bordered rounded-full font-medium {{ $store->pipeline_status->badgeClass() }}"
                 >
-                    @foreach (\App\Models\Store::$statusLabels as $value => $label)
-                        <option value="{{ $value }}" @selected($store->pipeline_status === $value)>
-                            {{ $label }}
+                    @foreach (PipelineStatus::cases() as $status)
+                        <option value="{{ $status->value }}" @selected($store->pipeline_status === $status)>
+                            {{ $status->label() }}
                         </option>
                     @endforeach
                 </select>
@@ -295,9 +284,9 @@
                         wire:change="updateStatus({{ $store->id }}, $event.target.value)"
                         class="select select-bordered w-full"
                     >
-                        @foreach (\App\Models\Store::$statusLabels as $value => $label)
-                            <option value="{{ $value }}" @selected($store->pipeline_status === $value)>
-                                {{ $label }}
+                        @foreach (PipelineStatus::cases() as $status)
+                            <option value="{{ $status->value }}" @selected($store->pipeline_status === $status)>
+                                {{ $status->label() }}
                             </option>
                         @endforeach
                     </select>
@@ -334,7 +323,7 @@
                 @if ($store->discovery_source)
                     <div>
                         <h4 class="text-sm font-semibold text-base-content/50 mb-2">Bron</h4>
-                        <x-badge value="{{ ucfirst($store->discovery_source) }}" class="badge-neutral badge-soft badge-sm" />
+                        <x-badge value="{{ $store->discovery_source->label() }}" class="badge-neutral badge-soft badge-sm" />
                     </div>
                 @endif
             </div>

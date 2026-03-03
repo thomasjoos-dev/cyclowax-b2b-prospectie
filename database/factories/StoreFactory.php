@@ -2,6 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Enums\DiscoverySource;
+use App\Enums\PipelineStatus;
 use App\Models\Store;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -57,16 +59,19 @@ class StoreFactory extends Factory
             'latitude' => fake()->latitude(50.8, 51.3),
             'longitude' => fake()->longitude(3.0, 5.5),
             'pipeline_status' => fake()->randomElement([
-                'niet_gecontacteerd',
-                'niet_gecontacteerd',
-                'niet_gecontacteerd',
-                'gecontacteerd',
-                'in_gesprek',
-                'partner',
-                'afgewezen',
+                PipelineStatus::NietGecontacteerd,
+                PipelineStatus::NietGecontacteerd,
+                PipelineStatus::NietGecontacteerd,
+                PipelineStatus::Gecontacteerd,
+                PipelineStatus::InGesprek,
+                PipelineStatus::Partner,
+                PipelineStatus::Afgewezen,
             ]),
             'is_existing_customer' => false,
-            'discovery_source' => 'overpass',
+            'discovery_source' => DiscoverySource::Overpass,
+            'has_workshop' => fake()->boolean(40),
+            'has_webshop' => fake()->boolean(30),
+            'instagram_handle' => fake()->boolean(20) ? '@'.fake()->userName() : null,
             'notes' => null,
             'last_contacted_at' => null,
             'assigned_to' => null,
@@ -76,7 +81,7 @@ class StoreFactory extends Factory
     public function contacted(): static
     {
         return $this->state(fn () => [
-            'pipeline_status' => 'gecontacteerd',
+            'pipeline_status' => PipelineStatus::Gecontacteerd,
             'last_contacted_at' => fake()->dateTimeBetween('-30 days'),
         ]);
     }
@@ -84,9 +89,14 @@ class StoreFactory extends Factory
     public function partner(): static
     {
         return $this->state(fn () => [
-            'pipeline_status' => 'partner',
+            'pipeline_status' => PipelineStatus::Partner,
             'last_contacted_at' => fake()->dateTimeBetween('-60 days'),
         ]);
+    }
+
+    public function withWorkshop(): static
+    {
+        return $this->state(fn () => ['has_workshop' => true]);
     }
 
     public function withCompleteContact(): static

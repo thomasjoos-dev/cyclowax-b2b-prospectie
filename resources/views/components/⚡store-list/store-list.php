@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\PipelineStatus;
 use App\Models\Store;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -42,17 +43,17 @@ new class extends Component
     public function updateStatus(int $storeId, string $status): void
     {
         $store = Store::query()->findOrFail($storeId);
+        $newStatus = PipelineStatus::from($status);
 
-        $data = ['pipeline_status' => $status];
+        $data = ['pipeline_status' => $newStatus];
 
-        if ($store->pipeline_status === 'niet_gecontacteerd' && $status !== 'niet_gecontacteerd') {
+        if ($store->pipeline_status === PipelineStatus::NietGecontacteerd && $newStatus !== PipelineStatus::NietGecontacteerd) {
             $data['last_contacted_at'] = now();
         }
 
         $store->update($data);
 
-        $label = Store::$statusLabels[$status] ?? $status;
-        $this->success("Status bijgewerkt naar '{$label}'");
+        $this->success("Status bijgewerkt naar '{$newStatus->label()}'");
     }
 
     public function selectStore(int $storeId): void
@@ -225,7 +226,7 @@ new class extends Component
 
         return array_merge(
             ['all' => array_sum($counts)],
-            array_fill_keys(array_keys(Store::$statusLabels), 0),
+            array_fill_keys(array_column(PipelineStatus::cases(), 'value'), 0),
             $counts,
         );
     }

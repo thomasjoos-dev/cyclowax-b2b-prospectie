@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Enums\DiscoverySource;
+use App\Enums\PipelineStatus;
 use App\Models\Store;
 
 class StoreImportService
@@ -48,8 +50,9 @@ class StoreImportService
                 'website' => $data['website'] ?? null,
                 'latitude' => $data['latitude'] ?? null,
                 'longitude' => $data['longitude'] ?? null,
-                'discovery_source' => 'overpass',
-                'pipeline_status' => 'niet_gecontacteerd',
+                'has_workshop' => $data['has_workshop'] ?? false,
+                'discovery_source' => DiscoverySource::Overpass,
+                'pipeline_status' => PipelineStatus::NietGecontacteerd,
                 'is_existing_customer' => false,
             ]);
 

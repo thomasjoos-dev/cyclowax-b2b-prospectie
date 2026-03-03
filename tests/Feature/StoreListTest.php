@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\PipelineStatus;
 use App\Models\Store;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -23,8 +24,8 @@ test('search filters stores by name', function () {
 });
 
 test('status filter shows only matching stores', function () {
-    Store::factory()->create(['name' => 'Shop A', 'pipeline_status' => 'niet_gecontacteerd']);
-    Store::factory()->create(['name' => 'Shop B', 'pipeline_status' => 'partner']);
+    Store::factory()->create(['name' => 'Shop A', 'pipeline_status' => PipelineStatus::NietGecontacteerd]);
+    Store::factory()->create(['name' => 'Shop B', 'pipeline_status' => PipelineStatus::Partner]);
 
     Livewire::test('store-list')
         ->set('statusFilter', 'partner')
@@ -64,7 +65,7 @@ test('contact filter complete shows only stores with all contact info', function
 
 test('status update works and sets last_contacted_at when leaving niet_gecontacteerd', function () {
     $store = Store::factory()->create([
-        'pipeline_status' => 'niet_gecontacteerd',
+        'pipeline_status' => PipelineStatus::NietGecontacteerd,
         'last_contacted_at' => null,
     ]);
 
@@ -72,14 +73,14 @@ test('status update works and sets last_contacted_at when leaving niet_gecontact
         ->call('updateStatus', $store->id, 'gecontacteerd');
 
     $store->refresh();
-    expect($store->pipeline_status)->toBe('gecontacteerd')
+    expect($store->pipeline_status)->toBe(PipelineStatus::Gecontacteerd)
         ->and($store->last_contacted_at)->not->toBeNull();
 });
 
 test('status update does not overwrite last_contacted_at when already contacted', function () {
     $originalDate = now()->subDays(5);
     $store = Store::factory()->create([
-        'pipeline_status' => 'gecontacteerd',
+        'pipeline_status' => PipelineStatus::Gecontacteerd,
         'last_contacted_at' => $originalDate,
     ]);
 
@@ -87,7 +88,7 @@ test('status update does not overwrite last_contacted_at when already contacted'
         ->call('updateStatus', $store->id, 'in_gesprek');
 
     $store->refresh();
-    expect($store->pipeline_status)->toBe('in_gesprek')
+    expect($store->pipeline_status)->toBe(PipelineStatus::InGesprek)
         ->and($store->last_contacted_at->format('Y-m-d'))->toBe($originalDate->format('Y-m-d'));
 });
 
@@ -114,9 +115,9 @@ test('selecting a store opens the drawer', function () {
 });
 
 test('pipeline stats reflect active filters', function () {
-    Store::factory()->create(['city' => 'Antwerpen', 'pipeline_status' => 'niet_gecontacteerd']);
-    Store::factory()->create(['city' => 'Antwerpen', 'pipeline_status' => 'partner']);
-    Store::factory()->create(['city' => 'Gent', 'pipeline_status' => 'niet_gecontacteerd']);
+    Store::factory()->create(['city' => 'Antwerpen', 'pipeline_status' => PipelineStatus::NietGecontacteerd]);
+    Store::factory()->create(['city' => 'Antwerpen', 'pipeline_status' => PipelineStatus::Partner]);
+    Store::factory()->create(['city' => 'Gent', 'pipeline_status' => PipelineStatus::NietGecontacteerd]);
 
     $component = Livewire::test('store-list')
         ->set('cityFilter', 'Antwerpen');
@@ -127,7 +128,7 @@ test('pipeline stats reflect active filters', function () {
         ->and($stats['partner'])->toBe(1);
 });
 
-// --- New tests: Country filter ---
+// --- Country filter ---
 
 test('country filter shows only stores in selected country', function () {
     Store::factory()->create(['name' => 'Belgian Shop', 'country' => 'BE']);
@@ -140,9 +141,9 @@ test('country filter shows only stores in selected country', function () {
 });
 
 test('pipeline stats react to country filter', function () {
-    Store::factory()->create(['country' => 'BE', 'pipeline_status' => 'niet_gecontacteerd']);
-    Store::factory()->create(['country' => 'BE', 'pipeline_status' => 'partner']);
-    Store::factory()->create(['country' => 'DE', 'pipeline_status' => 'niet_gecontacteerd']);
+    Store::factory()->create(['country' => 'BE', 'pipeline_status' => PipelineStatus::NietGecontacteerd]);
+    Store::factory()->create(['country' => 'BE', 'pipeline_status' => PipelineStatus::Partner]);
+    Store::factory()->create(['country' => 'DE', 'pipeline_status' => PipelineStatus::NietGecontacteerd]);
 
     $stats = Livewire::test('store-list')
         ->set('countryFilter', 'BE')
@@ -166,7 +167,7 @@ test('city options react to country filter', function () {
         ->and($cityNames)->not->toContain('Berlin');
 });
 
-// --- New tests: Assigned filter ---
+// --- Assigned filter ---
 
 test('assigned filter shows only stores of selected team member', function () {
     Store::factory()->assignedTo('olivier')->create(['name' => 'Olivier Shop']);
@@ -188,7 +189,7 @@ test('assigned filter unassigned shows only stores without assignment', function
         ->assertDontSee('Assigned Shop');
 });
 
-// --- New tests: Bulk assignment ---
+// --- Bulk assignment ---
 
 test('bulk assignment assigns multiple stores at once', function () {
     $stores = Store::factory()->count(3)->create(['assigned_to' => null]);
@@ -213,7 +214,7 @@ test('bulk assignment clears selection after assigning', function () {
         ->assertSet('selectedIds', []);
 });
 
-// --- New tests: Individual assignment from drawer ---
+// --- Individual assignment from drawer ---
 
 test('individual assignment from drawer works', function () {
     $store = Store::factory()->create(['assigned_to' => null]);
