@@ -24,6 +24,8 @@ new class extends Component
 
     public string $assignedFilter = '';
 
+    public string $brandFilter = '';
+
     /** @var array<int, int> */
     public array $selectedIds = [];
 
@@ -151,6 +153,11 @@ new class extends Component
         $this->resetPage();
     }
 
+    public function updatingBrandFilter(): void
+    {
+        $this->resetPage();
+    }
+
     /**
      * @return array<int, array{key: string, label: string, class?: string, sortable?: bool}>
      */
@@ -193,6 +200,18 @@ new class extends Component
             ->toArray();
     }
 
+    /** @return array<int, array{id: int, name: string}> */
+    #[Computed]
+    public function brandOptions(): array
+    {
+        return \App\Models\Brand::query()
+            ->whereHas('stores')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (\App\Models\Brand $brand) => ['id' => $brand->id, 'name' => $brand->name])
+            ->toArray();
+    }
+
     /** @return array<int, array{id: string, name: string}> */
     #[Computed]
     public function teamOptions(): array
@@ -217,6 +236,7 @@ new class extends Component
 
         $this->applyContactFilter($query);
         $this->applyAssignedFilter($query);
+        $this->applyBrandFilter($query);
 
         $counts = $query
             ->selectRaw('pipeline_status, count(*) as total')
@@ -267,6 +287,7 @@ new class extends Component
 
         $this->applyContactFilter($query);
         $this->applyAssignedFilter($query);
+        $this->applyBrandFilter($query);
 
         return $query
             ->orderBy($this->sortBy['column'], $this->sortBy['direction'])
@@ -291,5 +312,12 @@ new class extends Component
             '' => null,
             default => $query->where('assigned_to', $this->assignedFilter),
         };
+    }
+
+    private function applyBrandFilter($query): void
+    {
+        if ($this->brandFilter !== '') {
+            $query->whereHas('brands', fn ($q) => $q->where('brands.id', $this->brandFilter));
+        }
     }
 };

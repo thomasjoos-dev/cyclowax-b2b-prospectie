@@ -82,7 +82,7 @@
             placeholder-value=""
         />
     </div>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
         <x-select
             :options="$contactFilterOptions"
             wire:model.live="contactFilter"
@@ -91,6 +91,12 @@
             :options="$this->teamOptions"
             wire:model.live="assignedFilter"
             placeholder="Alle teamleden"
+            placeholder-value=""
+        />
+        <x-select
+            :options="$this->brandOptions"
+            wire:model.live="brandFilter"
+            placeholder="Alle merken"
             placeholder-value=""
         />
     </div>
