@@ -87,7 +87,7 @@ class ImportBrandLocator extends Command
 
         return match (mb_strtolower($brand->slug)) {
             'specialized' => $specializedService->fetchDealersForCountry($country, function (int $current, int $total) {
-                $this->output->write("\r  Grid sweep: {$current}/{$total} punten");
+                $this->output->write("\r  Pagina: {$current}/{$total}");
 
                 if ($current === $total) {
                     $this->newLine();

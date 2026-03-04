@@ -11,57 +11,48 @@ class SpecializedLocatorService
 
     private const RATE_LIMIT_SECONDS = 1;
 
+    private const PAGE_LIMIT = 50;
+
     private static float $lastRequestAt = 0.0;
 
     /**
-     * Country configurations: baseSiteId and bounding box [minLat, maxLat, minLon, maxLon].
+     * Country configurations: center GPS coordinates and search radius in miles.
      *
-     * @var array<string, array{baseSiteId: string, bounds: array{float, float, float, float}}>
+     * @var array<string, array{center: array{float, float}, radius: int}>
      */
     private const COUNTRIES = [
-        'BE' => [
-            'baseSiteId' => 'SBCBelgium',
-            'bounds' => [49.5, 51.5, 2.5, 6.5],
-        ],
-        'DE' => [
-            'baseSiteId' => 'SBCGermany',
-            'bounds' => [47.3, 55.1, 5.9, 15.1],
-        ],
+        'BE' => ['center' => [50.5039, 4.4699], 'radius' => 100],
+        'DE' => ['center' => [51.1657, 10.4515], 'radius' => 400],
+        'CH' => ['center' => [46.8182, 8.2275], 'radius' => 200],
     ];
 
-    private const GRID_SPACING = 0.5;
-
     private const GRAPHQL_QUERY = <<<'GRAPHQL'
-    query GET_RETAILERS($latitude: Float!, $longitude: Float!, $baseSiteId: String!, $deliveryStyle: String!) {
-        getRetailers(
-            latitude: $latitude
-            longitude: $longitude
-            baseSiteId: $baseSiteId
-            deliveryStyle: $deliveryStyle
-        ) {
-            retailers {
-                name
-                address
-                city
-                postalCode
-                country
-                telephone
-                email
-                latitude
-                longitude
+    query getYextGeoSearch($location: String!, $limit: String, $radius: String, $offset: String) {
+        getYextGeoSearch(location: $location, limit: $limit, radius: $radius, offset: $offset) {
+            response {
+                count
+                stores {
+                    name
+                    address { line1 city region postalCode countryCode }
+                    mainPhone
+                    emails
+                    websiteUrl { url }
+                    yextDisplayCoordinate { latitude longitude }
+                }
             }
         }
     }
     GRAPHQL;
 
     /**
-     * Fetch all Specialized dealers for a country using a grid sweep.
+     * Fetch all Specialized dealers for a country using center-point + radius pagination.
      *
      * @return array{dealers: array<int, array<string, mixed>>, queries: int}
      */
     public function fetchDealersForCountry(string $countryCode, ?callable $onProgress = null): array
     {
-        $country = self::COUNTRIES[strtoupper($countryCode)] ?? null;
+        $countryCode = strtoupper($countryCode);
+        $country = self::COUNTRIES[$countryCode] ?? null;
 
         if (! $country) {
             Log::warning('Specialized: unsupported country code', ['country' => $countryCode]);
@@ -69,126 +60,142 @@ class SpecializedLocatorService
             return ['dealers' => [], 'queries' => 0];
         }
 
-        $gridPoints = $this->generateGridPoints($country['bounds']);
-        $totalPoints = count($gridPoints);
-        $seen = [];
-        $dealers = [];
-        $queryCount = 0;
+        $location = "{$country['center'][0]},{$country['center'][1]}";
+        $radius = (string) $country['radius'];
 
-        foreach ($gridPoints as $index => $point) {
-            $results = $this->fetchDealersNearPoint($point[0], $point[1], $country['baseSiteId']);
+        $allStores = [];
+        $offset = 0;
+        $queryCount = 0;
+        $totalCount = null;
+        $totalPages = 1;
+
+        do {
+            $response = $this->fetchPage($location, $radius, $offset);
             $queryCount++;
 
-            foreach ($results as $dealer) {
-                $key = $this->deduplicationKey($dealer['name'], $dealer['postal_code']);
-
-                if (isset($seen[$key])) {
-                    continue;
-                }
-
-                $seen[$key] = true;
-                $dealers[] = $dealer;
+            if ($response === null) {
+                break;
             }
+
+            if ($totalCount === null) {
+                $totalCount = $response['count'];
+                $totalPages = (int) ceil($totalCount / self::PAGE_LIMIT);
+            }
+
+            $allStores = array_merge($allStores, $response['stores']);
 
             if ($onProgress) {
-                $onProgress($index + 1, $totalPoints);
+                $currentPage = (int) floor($offset / self::PAGE_LIMIT) + 1;
+                $onProgress($currentPage, $totalPages);
             }
-        }
 
-        return ['dealers' => $dealers, 'queries' => $queryCount];
+            $offset += self::PAGE_LIMIT;
+        } while ($offset < ($totalCount ?? 0));
+
+        $filtered = $this->filterAndNormalize($allStores, $countryCode);
+
+        return ['dealers' => $filtered, 'queries' => $queryCount];
     }
 
     /**
-     * Fetch dealers near a single coordinate via the Specialized GraphQL API.
-     *
-     * @return array<int, array{name: string, address: string|null, city: string|null, postal_code: string|null, country: string|null, phone: string|null, email: string|null, latitude: float|null, longitude: float|null}>
+     * @return array{count: int, stores: array<int, array<string, mixed>>}|null
      */
-    public function fetchDealersNearPoint(float $lat, float $lon, string $baseSiteId): array
+    private function fetchPage(string $location, string $radius, int $offset): ?array
     {
         $this->respectRateLimit();
 
+        $variables = json_encode([
+            'location' => $location,
+            'limit' => (string) self::PAGE_LIMIT,
+            'radius' => $radius,
+            'offset' => (string) $offset,
+        ]);
+
         $response = Http::timeout(30)
             ->withHeaders([
-                'Content-Type' => 'application/json',
-                'x-apollo-operation-name' => 'GET_RETAILERS',
+                'Accept' => 'application/json',
+                'x-apollo-operation-name' => 'getYextGeoSearch',
             ])
-            ->post(self::ENDPOINT, [
-                'operationName' => 'GET_RETAILERS',
+            ->get(self::ENDPOINT, [
+                'operationName' => 'getYextGeoSearch',
                 'query' => self::GRAPHQL_QUERY,
-                'variables' => [
-                    'latitude' => $lat,
-                    'longitude' => $lon,
-                    'baseSiteId' => $baseSiteId,
-                    'deliveryStyle' => 'CLICK_AND_COLLECT',
-                ],
+                'variables' => $variables,
             ]);
 
         if ($response->failed()) {
             Log::error('Specialized API request failed', [
-                'lat' => $lat,
-                'lon' => $lon,
-                'baseSiteId' => $baseSiteId,
                 'status' => $response->status(),
+                'offset' => $offset,
             ]);
 
-            return [];
+            return null;
         }
 
-        return $this->parseResponse($response->json() ?? []);
+        $data = $response->json('data.getYextGeoSearch.response');
+
+        if (! $data) {
+            Log::warning('Specialized: unexpected response structure', ['offset' => $offset]);
+
+            return null;
+        }
+
+        return [
+            'count' => $data['count'] ?? 0,
+            'stores' => $data['stores'] ?? [],
+        ];
     }
 
     /**
-     * @param  array{float, float, float, float}  $bounds  [minLat, maxLat, minLon, maxLon]
-     * @return array<int, array{float, float}>
+     * Filter stores by country code, normalize to standard dealer format, and deduplicate.
+     *
+     * @param  array<int, array<string, mixed>>  $stores
+     * @return array<int, array<string, mixed>>
      */
-    private function generateGridPoints(array $bounds): array
+    private function filterAndNormalize(array $stores, string $countryCode): array
     {
-        [$minLat, $maxLat, $minLon, $maxLon] = $bounds;
-        $points = [];
-
-        for ($lat = $minLat; $lat <= $maxLat; $lat += self::GRID_SPACING) {
-            for ($lon = $minLon; $lon <= $maxLon; $lon += self::GRID_SPACING) {
-                $points[] = [round($lat, 2), round($lon, 2)];
-            }
-        }
-
-        return $points;
-    }
-
-    /**
-     * @return array<int, array{name: string, address: string|null, city: string|null, postal_code: string|null, country: string|null, phone: string|null, email: string|null, latitude: float|null, longitude: float|null}>
-     */
-    private function parseResponse(array $data): array
-    {
-        $retailers = data_get($data, 'data.getRetailers.retailers') ?? [];
+        $seen = [];
         $dealers = [];
 
-        foreach ($retailers as $retailer) {
-            $name = $retailer['name'] ?? null;
+        foreach ($stores as $store) {
+            $storeCountry = strtoupper($store['address']['countryCode'] ?? '');
 
-            if (! $name) {
+            if ($storeCountry !== $countryCode) {
                 continue;
             }
 
+            $name = trim($store['name'] ?? '');
+
+            if ($name === '') {
+                continue;
+            }
+
+            $postalCode = trim($store['address']['postalCode'] ?? '');
+            $dedupeKey = mb_strtolower($name).'|'.$postalCode;
+
+            if (isset($seen[$dedupeKey])) {
+                continue;
+            }
+
+            $seen[$dedupeKey] = true;
+
+            $emails = $store['emails'] ?? [];
+            $email = is_array($emails) && count($emails) > 0 ? $emails[0] : null;
+
             $dealers[] = [
                 'name' => $name,
-                'address' => $retailer['address'] ?? null,
-                'city' => $retailer['city'] ?? null,
-                'postal_code' => $retailer['postalCode'] ?? null,
-                'country' => $retailer['country'] ?? null,
-                'phone' => $retailer['telephone'] ?? null,
-                'email' => $retailer['email'] ?? null,
-                'latitude' => isset($retailer['latitude']) ? (float) $retailer['latitude'] : null,
-                'longitude' => isset($retailer['longitude']) ? (float) $retailer['longitude'] : null,
+                'address' => trim($store['address']['line1'] ?? '') ?: null,
+                'city' => trim($store['address']['city'] ?? '') ?: null,
+                'postal_code' => $postalCode ?: null,
+                'country' => $countryCode,
+                'phone' => trim($store['mainPhone'] ?? '') ?: null,
+                'email' => $email,
+                'website' => $store['websiteUrl']['url'] ?? null,
+                'latitude' => $store['yextDisplayCoordinate']['latitude'] ?? null,
+                'longitude' => $store['yextDisplayCoordinate']['longitude'] ?? null,
             ];
         }
 
         return $dealers;
-    }
-
-    private function deduplicationKey(string $name, ?string $postalCode): string
-    {
-        return mb_strtolower($name).'|'.($postalCode ?? '');
     }
 
     private function respectRateLimit(): void
