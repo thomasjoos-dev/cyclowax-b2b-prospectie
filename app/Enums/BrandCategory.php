@@ -9,6 +9,7 @@ enum BrandCategory: string
     case Clothing = 'clothing';
     case Tools = 'tools';
     case Accessories = 'accessories';
+    case Tyres = 'tyres';
 
     public function label(): string
     {
@@ -18,6 +19,7 @@ enum BrandCategory: string
             self::Clothing => 'Kleding',
             self::Tools => 'Gereedschap',
             self::Accessories => 'Accessoires',
+            self::Tyres => 'Banden',
         };
     }
 

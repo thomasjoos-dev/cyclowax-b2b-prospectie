@@ -17,7 +17,7 @@ new class extends Component
 ?>
 
 @php
-    use App\Models\Store;
+    use App\Enums\PipelineStatus;
 
     $exampleOptions = [
         ['id' => '1', 'name' => 'Optie A'],
@@ -134,18 +134,8 @@ new class extends Component
             <div>
                 <h4 class="text-sm font-semibold mb-2">Pipeline statussen</h4>
                 <div class="flex flex-wrap gap-2">
-                    @foreach (Store::$statusLabels as $value => $label)
-                        @php
-                            $badgeClass = match($value) {
-                                'niet_gecontacteerd' => 'badge-neutral badge-soft',
-                                'gecontacteerd'      => 'badge-info badge-soft',
-                                'in_gesprek'         => 'badge-warning badge-soft',
-                                'partner'            => 'badge-success badge-soft',
-                                'afgewezen'          => 'badge-error badge-soft',
-                                default              => '',
-                            };
-                        @endphp
-                        <x-badge value="{{ $label }}" class="{{ $badgeClass }}" />
+                    @foreach (PipelineStatus::cases() as $status)
+                        <x-badge value="{{ $status->label() }}" class="{{ $status->badgeClass() }}" />
                     @endforeach
                 </div>
             </div>

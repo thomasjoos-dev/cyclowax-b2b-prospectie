@@ -7,8 +7,11 @@ use App\Enums\PipelineStatus;
 use App\Models\Brand;
 use App\Models\Store;
 use App\Services\AbusLocatorService;
+use App\Services\BassoLocatorService;
+use App\Services\SchwalbeLocatorService;
 use App\Services\SpecializedLocatorService;
 use App\Services\StoreMatchingService;
+use App\Services\TrekLocatorService;
 use Illuminate\Console\Command;
 
 class ImportBrandLocator extends Command
@@ -82,21 +85,25 @@ class ImportBrandLocator extends Command
             return $this->fetchFromFile($brand, $file);
         }
 
-        // For now only Specialized is supported for live API scraping
-        if (mb_strtolower($brand->slug) !== 'specialized') {
-            $this->warn("Locator scraping voor \"{$brand->name}\" is nog niet geïmplementeerd.");
-            $this->warn('Gebruik --file=pad/naar/bestand.json voor merken die manuele export vereisen.');
+        return match (mb_strtolower($brand->slug)) {
+            'specialized' => $specializedService->fetchDealersForCountry($country, function (int $current, int $total) {
+                $this->output->write("\r  Grid sweep: {$current}/{$total} punten");
 
-            return ['dealers' => [], 'queries' => 0];
-        }
+                if ($current === $total) {
+                    $this->newLine();
+                }
+            }),
+            'basso' => app(BassoLocatorService::class)->fetchDealersForCountry($country),
+            'schwalbe' => app(SchwalbeLocatorService::class)->fetchDealersForCountry($country),
+            'trek' => app(TrekLocatorService::class)->fetchDealersForCountry($country, function (int $current, int $total) {
+                $this->output->write("\r  Pagina: {$current}/{$total}");
 
-        return $specializedService->fetchDealersForCountry($country, function (int $current, int $total) {
-            $this->output->write("\r  Grid sweep: {$current}/{$total} punten");
-
-            if ($current === $total) {
-                $this->newLine();
-            }
-        });
+                if ($current === $total) {
+                    $this->newLine();
+                }
+            }),
+            default => $this->unsupportedLiveImport($brand),
+        };
     }
 
     /**
@@ -122,6 +129,17 @@ class ImportBrandLocator extends Command
     private function unsupportedFileImport(Brand $brand): array
     {
         $this->warn("JSON-import voor \"{$brand->name}\" is nog niet geïmplementeerd.");
+
+        return ['dealers' => [], 'queries' => 0];
+    }
+
+    /**
+     * @return array{dealers: array<int, array<string, mixed>>, queries: int}
+     */
+    private function unsupportedLiveImport(Brand $brand): array
+    {
+        $this->warn("Locator scraping voor \"{$brand->name}\" is nog niet geïmplementeerd.");
+        $this->warn('Gebruik --file=pad/naar/bestand.json voor merken die manuele export vereisen.');
 
         return ['dealers' => [], 'queries' => 0];
     }

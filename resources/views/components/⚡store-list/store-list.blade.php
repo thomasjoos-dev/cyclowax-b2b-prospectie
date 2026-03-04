@@ -82,8 +82,6 @@
             :options="$this->countryOptions"
             wire:model.live="countryFilter"
             placeholder="Alle landen"
-            compact
-            compact-text="landen"
             clearable
         />
         <x-choices-offline
@@ -99,24 +97,18 @@
             :options="$contactFilterOptions"
             wire:model.live="contactFilter"
             placeholder="Alle contactinfo"
-            compact
-            compact-text="filters"
             clearable
         />
         <x-choices-offline
             :options="$this->teamOptions"
             wire:model.live="assignedFilter"
             placeholder="Alle teamleden"
-            compact
-            compact-text="teamleden"
             clearable
         />
         <x-choices-offline
             :options="$this->brandOptions"
             wire:model.live="brandFilter"
             placeholder="Alle merken"
-            compact
-            compact-text="merken"
             clearable
         />
     </div>

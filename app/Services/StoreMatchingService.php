@@ -17,7 +17,16 @@ class StoreMatchingService
     ];
 
     /**
+     * Approximate degree offset for 300m (~0.003°).
+     * Used as cheap bounding-box pre-filter before haversine.
+     */
+    private const PROXIMITY_DEGREE_THRESHOLD = 0.003;
+
+    /**
      * Match an array of external dealers against existing stores in the database.
+     *
+     * Uses a postal-code index for O(1) lookups in steps 1+2,
+     * with a GPS proximity fallback for unmatched dealers.
      *
      * @param  array<int, array<string, mixed>>  $dealers
      * @param  string  $brandName  Used to strip brand suffixes from dealer names
@@ -26,11 +35,20 @@ class StoreMatchingService
     public function match(array $dealers, string $brandName = ''): array
     {
         $stores = Store::all();
+
+        // Build postal code index for fast lookup in steps 1+2
+        $postalIndex = [];
+        foreach ($stores as $store) {
+            if ($store->postal_code) {
+                $postalIndex[$store->postal_code][] = $store;
+            }
+        }
+
         $matched = [];
         $unmatched = [];
 
         foreach ($dealers as $dealer) {
-            $result = $this->findBestMatch($dealer, $stores, $brandName);
+            $result = $this->findBestMatch($dealer, $stores, $postalIndex, $brandName);
 
             if ($result) {
                 $matched[] = $result;
@@ -44,9 +62,10 @@ class StoreMatchingService
 
     /**
      * @param  Collection<int, Store>  $stores
+     * @param  array<string, array<int, Store>>  $postalIndex
      * @return array{dealer: array<string, mixed>, store: Store, confidence: float}|null
      */
-    private function findBestMatch(array $dealer, Collection $stores, string $brandName): ?array
+    private function findBestMatch(array $dealer, Collection $stores, array $postalIndex, string $brandName): ?array
     {
         $normalizedDealer = $this->normalizeName($dealer['name'], $brandName);
         $dealerPostal = $dealer['postal_code'] ?? null;
@@ -56,40 +75,58 @@ class StoreMatchingService
         $bestMatch = null;
         $bestConfidence = 0.0;
 
-        foreach ($stores as $store) {
-            $normalizedStore = $this->normalizeName($store->name, $brandName);
-            $confidence = 0.0;
+        // Steps 1+2: Match against stores with the same postal code (fast)
+        if ($dealerPostal && isset($postalIndex[$dealerPostal])) {
+            foreach ($postalIndex[$dealerPostal] as $store) {
+                $normalizedStore = $this->normalizeName($store->name, $brandName);
 
-            // Step 1: Exact match on postal code + normalized name
-            if ($dealerPostal && $store->postal_code === $dealerPostal && $normalizedDealer === $normalizedStore) {
-                $confidence = 1.0;
-            }
+                // Step 1: Exact match — return immediately
+                if ($normalizedDealer === $normalizedStore) {
+                    return [
+                        'dealer' => $dealer,
+                        'store' => $store,
+                        'confidence' => 1.0,
+                    ];
+                }
 
-            // Step 2: Fuzzy match on postal code + similar name
-            if ($confidence === 0.0 && $dealerPostal && $store->postal_code === $dealerPostal) {
+                // Step 2: Fuzzy match (>= 70% similarity)
                 similar_text($normalizedDealer, $normalizedStore, $percent);
 
-                if ($percent >= 70) {
-                    $confidence = $percent / 100;
+                if ($percent >= 70 && $percent / 100 > $bestConfidence) {
+                    $bestConfidence = $percent / 100;
+                    $bestMatch = $store;
                 }
             }
+        }
 
-            // Step 3: Proximity match (< 200m) + similar name
-            if ($confidence === 0.0 && $dealerLat && $dealerLon && $store->latitude && $store->longitude) {
+        // Step 3: GPS proximity fallback (< 200m) — only when postal code didn't match
+        if ($bestConfidence === 0.0 && $dealerLat && $dealerLon) {
+            foreach ($stores as $store) {
+                if (! $store->latitude || ! $store->longitude) {
+                    continue;
+                }
+
+                // Cheap bounding-box pre-filter before expensive haversine
+                if (abs($dealerLat - (float) $store->latitude) > self::PROXIMITY_DEGREE_THRESHOLD
+                    || abs($dealerLon - (float) $store->longitude) > self::PROXIMITY_DEGREE_THRESHOLD) {
+                    continue;
+                }
+
                 $distance = $this->haversineDistance($dealerLat, $dealerLon, (float) $store->latitude, (float) $store->longitude);
 
                 if ($distance < 200) {
+                    $normalizedStore = $this->normalizeName($store->name, $brandName);
                     similar_text($normalizedDealer, $normalizedStore, $percent);
 
                     if ($percent >= 60) {
                         $confidence = ($percent / 100) * 0.9;
+
+                        if ($confidence > $bestConfidence) {
+                            $bestConfidence = $confidence;
+                            $bestMatch = $store;
+                        }
                     }
                 }
-            }
-
-            if ($confidence > $bestConfidence) {
-                $bestConfidence = $confidence;
-                $bestMatch = $store;
             }
         }
 
