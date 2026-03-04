@@ -8,6 +8,7 @@ enum BrandCategory: string
     case Nutrition = 'nutrition';
     case Clothing = 'clothing';
     case Tools = 'tools';
+    case Accessories = 'accessories';
 
     public function label(): string
     {
@@ -16,6 +17,7 @@ enum BrandCategory: string
             self::Nutrition => 'Voeding',
             self::Clothing => 'Kleding',
             self::Tools => 'Gereedschap',
+            self::Accessories => 'Accessoires',
         };
     }
 
@@ -28,6 +30,6 @@ enum BrandCategory: string
     /** @return array<int, self> */
     public static function accessoryCategories(): array
     {
-        return [self::Nutrition, self::Clothing, self::Tools];
+        return [self::Nutrition, self::Clothing, self::Tools, self::Accessories];
     }
 }

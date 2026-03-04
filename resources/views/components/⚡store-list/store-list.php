@@ -16,15 +16,20 @@ new class extends Component
 
     public string $statusFilter = '';
 
-    public string $cityFilter = '';
+    /** @var array<int, string> */
+    public array $cityFilter = [];
 
-    public string $contactFilter = '';
+    /** @var array<int, string> */
+    public array $contactFilter = [];
 
-    public string $countryFilter = '';
+    /** @var array<int, string> */
+    public array $countryFilter = [];
 
-    public string $assignedFilter = '';
+    /** @var array<int, string> */
+    public array $assignedFilter = [];
 
-    public string $brandFilter = '';
+    /** @var array<int, int> */
+    public array $brandFilter = [];
 
     /** @var array<int, int> */
     public array $selectedIds = [];
@@ -132,29 +137,49 @@ new class extends Component
         $this->resetPage();
     }
 
-    public function updatingCityFilter(): void
+    public function updatingCityFilter(&$value): void
     {
+        if (! is_array($value)) {
+            $value = [];
+        }
+
         $this->resetPage();
     }
 
-    public function updatingContactFilter(): void
+    public function updatingContactFilter(&$value): void
     {
+        if (! is_array($value)) {
+            $value = [];
+        }
+
         $this->resetPage();
     }
 
-    public function updatingCountryFilter(): void
+    public function updatingCountryFilter(&$value): void
     {
-        $this->cityFilter = '';
+        if (! is_array($value)) {
+            $value = [];
+        }
+
+        $this->cityFilter = [];
         $this->resetPage();
     }
 
-    public function updatingAssignedFilter(): void
+    public function updatingAssignedFilter(&$value): void
     {
+        if (! is_array($value)) {
+            $value = [];
+        }
+
         $this->resetPage();
     }
 
-    public function updatingBrandFilter(): void
+    public function updatingBrandFilter(&$value): void
     {
+        if (! is_array($value)) {
+            $value = [];
+        }
+
         $this->resetPage();
     }
 
@@ -192,7 +217,7 @@ new class extends Component
     {
         return Store::query()
             ->whereNotNull('city')
-            ->when($this->countryFilter, fn ($q) => $q->where('country', $this->countryFilter))
+            ->when(count($this->countryFilter) > 0, fn ($q) => $q->whereIn('country', $this->countryFilter))
             ->distinct()
             ->orderBy('city')
             ->pluck('city')
@@ -231,8 +256,8 @@ new class extends Component
     {
         $query = Store::query()
             ->when($this->search, fn ($q) => $q->where('name', 'like', "%{$this->search}%"))
-            ->when($this->countryFilter, fn ($q) => $q->where('country', $this->countryFilter))
-            ->when($this->cityFilter, fn ($q) => $q->where('city', $this->cityFilter));
+            ->when(count($this->countryFilter) > 0, fn ($q) => $q->whereIn('country', $this->countryFilter))
+            ->when(count($this->cityFilter) > 0, fn ($q) => $q->whereIn('city', $this->cityFilter));
 
         $this->applyContactFilter($query);
         $this->applyAssignedFilter($query);
@@ -282,8 +307,8 @@ new class extends Component
         $query = Store::query()
             ->when($this->search, fn ($q) => $q->where('name', 'like', "%{$this->search}%"))
             ->when($this->statusFilter, fn ($q) => $q->where('pipeline_status', $this->statusFilter))
-            ->when($this->countryFilter, fn ($q) => $q->where('country', $this->countryFilter))
-            ->when($this->cityFilter, fn ($q) => $q->where('city', $this->cityFilter));
+            ->when(count($this->countryFilter) > 0, fn ($q) => $q->whereIn('country', $this->countryFilter))
+            ->when(count($this->cityFilter) > 0, fn ($q) => $q->whereIn('city', $this->cityFilter));
 
         $this->applyContactFilter($query);
         $this->applyAssignedFilter($query);
@@ -296,28 +321,81 @@ new class extends Component
 
     private function applyContactFilter($query): void
     {
-        match ($this->contactFilter) {
-            'email' => $query->whereNotNull('email'),
-            'phone' => $query->whereNotNull('phone'),
-            'website' => $query->whereNotNull('website'),
-            'complete' => $query->whereNotNull('email')->whereNotNull('phone')->whereNotNull('website'),
-            default => null,
-        };
+        foreach ($this->contactFilter as $filter) {
+            match ($filter) {
+                'email' => $query->whereNotNull('email'),
+                'phone' => $query->whereNotNull('phone'),
+                'website' => $query->whereNotNull('website'),
+                'complete' => $query->whereNotNull('email')->whereNotNull('phone')->whereNotNull('website'),
+                default => null,
+            };
+        }
     }
 
     private function applyAssignedFilter($query): void
     {
-        match ($this->assignedFilter) {
-            '_unassigned' => $query->whereNull('assigned_to'),
-            '' => null,
-            default => $query->where('assigned_to', $this->assignedFilter),
-        };
+        if (count($this->assignedFilter) === 0) {
+            return;
+        }
+
+        $hasUnassigned = in_array('_unassigned', $this->assignedFilter);
+        $members = array_filter($this->assignedFilter, fn ($v) => $v !== '_unassigned');
+
+        $query->where(function ($q) use ($hasUnassigned, $members) {
+            if ($hasUnassigned) {
+                $q->whereNull('assigned_to');
+            }
+
+            if (count($members) > 0) {
+                $q->orWhereIn('assigned_to', $members);
+            }
+        });
     }
 
     private function applyBrandFilter($query): void
     {
-        if ($this->brandFilter !== '') {
-            $query->whereHas('brands', fn ($q) => $q->where('brands.id', $this->brandFilter));
+        foreach ($this->brandFilter as $brandId) {
+            $query->whereHas('brands', fn ($q) => $q->where('brands.id', $brandId));
         }
+    }
+
+    public function exportCsv()
+    {
+        return response()->streamDownload(function () {
+            $query = Store::query()
+                ->with('brands')
+                ->when($this->search, fn ($q) => $q->where('name', 'like', "%{$this->search}%"))
+                ->when($this->statusFilter, fn ($q) => $q->where('pipeline_status', $this->statusFilter))
+                ->when(count($this->countryFilter) > 0, fn ($q) => $q->whereIn('country', $this->countryFilter))
+                ->when(count($this->cityFilter) > 0, fn ($q) => $q->whereIn('city', $this->cityFilter));
+
+            $this->applyContactFilter($query);
+            $this->applyAssignedFilter($query);
+            $this->applyBrandFilter($query);
+
+            $query->orderBy('name');
+
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['Naam', 'Adres', 'Postcode', 'Stad', 'Land', 'Telefoon', 'Email', 'Website', 'Status', 'Merken']);
+
+            $query->chunk(500, function ($stores) use ($handle) {
+                foreach ($stores as $store) {
+                    fputcsv($handle, [
+                        $store->name,
+                        $store->address,
+                        $store->postal_code,
+                        $store->city,
+                        $store->country,
+                        $store->phone,
+                        $store->email,
+                        $store->website,
+                        $store->pipeline_status->label(),
+                        $store->brands->pluck('name')->implode(', '),
+                    ]);
+                }
+            });
+
+            fclose($handle);
+        }, 'stores-export-'.now()->format('Y-m-d').'.csv');
     }
 };

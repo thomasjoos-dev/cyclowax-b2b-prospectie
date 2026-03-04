@@ -6,6 +6,7 @@ use App\Enums\DiscoverySource;
 use App\Enums\PipelineStatus;
 use App\Models\Brand;
 use App\Models\Store;
+use App\Services\AbusLocatorService;
 use App\Services\SpecializedLocatorService;
 use App\Services\StoreMatchingService;
 use Illuminate\Console\Command;
@@ -15,6 +16,7 @@ class ImportBrandLocator extends Command
     protected $signature = 'brands:import-locator
         {brand : Merknaam of slug}
         {--country=BE : Landcode (BE of DE)}
+        {--file= : Pad naar JSON-bestand met dealer-data (voor merken achter Cloudflare)}
         {--dry-run : Toon matches zonder op te slaan}';
 
     protected $description = 'Importeer dealer-data van een merkwebsite en koppel aan bestaande stores';
@@ -72,22 +74,56 @@ class ImportBrandLocator extends Command
     /**
      * @return array{dealers: array<int, array<string, mixed>>, queries: int}
      */
-    private function fetchDealers(SpecializedLocatorService $service, Brand $brand, string $country): array
+    private function fetchDealers(SpecializedLocatorService $specializedService, Brand $brand, string $country): array
     {
-        // For now only Specialized is supported — extensible for future brands
+        $file = $this->option('file');
+
+        if ($file) {
+            return $this->fetchFromFile($brand, $file);
+        }
+
+        // For now only Specialized is supported for live API scraping
         if (mb_strtolower($brand->slug) !== 'specialized') {
             $this->warn("Locator scraping voor \"{$brand->name}\" is nog niet geïmplementeerd.");
+            $this->warn('Gebruik --file=pad/naar/bestand.json voor merken die manuele export vereisen.');
 
             return ['dealers' => [], 'queries' => 0];
         }
 
-        return $service->fetchDealersForCountry($country, function (int $current, int $total) {
+        return $specializedService->fetchDealersForCountry($country, function (int $current, int $total) {
             $this->output->write("\r  Grid sweep: {$current}/{$total} punten");
 
             if ($current === $total) {
                 $this->newLine();
             }
         });
+    }
+
+    /**
+     * @return array{dealers: array<int, array<string, mixed>>, queries: int}
+     */
+    private function fetchFromFile(Brand $brand, string $file): array
+    {
+        if (! file_exists($file)) {
+            $this->error("Bestand niet gevonden: {$file}");
+
+            return ['dealers' => [], 'queries' => 0];
+        }
+
+        return match (mb_strtolower($brand->slug)) {
+            'abus' => app(AbusLocatorService::class)->parseDealersFromFile($file),
+            default => $this->unsupportedFileImport($brand),
+        };
+    }
+
+    /**
+     * @return array{dealers: array<int, array<string, mixed>>, queries: int}
+     */
+    private function unsupportedFileImport(Brand $brand): array
+    {
+        $this->warn("JSON-import voor \"{$brand->name}\" is nog niet geïmplementeerd.");
+
+        return ['dealers' => [], 'queries' => 0];
     }
 
     /**

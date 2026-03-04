@@ -12,7 +12,6 @@
     );
 
     $contactFilterOptions = [
-        ['id' => '', 'name' => 'Alle contactinfo'],
         ['id' => 'email', 'name' => 'Heeft email'],
         ['id' => 'phone', 'name' => 'Heeft telefoon'],
         ['id' => 'website', 'name' => 'Heeft website'],
@@ -26,7 +25,17 @@
 
 <div>
     {{-- Header --}}
-    <x-header title="Fietswinkels" subtitle="Werklijst voor het salesteam" separator />
+    <x-header title="Fietswinkels" subtitle="Werklijst voor het salesteam" separator>
+        <x-slot:actions>
+            <x-button
+                wire:click="exportCsv"
+                label="Exporteer CSV"
+                icon="o-arrow-down-tray"
+                class="btn-outline btn-sm"
+                spinner="exportCsv"
+            />
+        </x-slot:actions>
+    </x-header>
 
     {{-- Pipeline stats --}}
     <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
@@ -69,35 +78,46 @@
             wire:model.live.debounce.300ms="search"
             clearable
         />
-        <x-select
+        <x-choices-offline
             :options="$this->countryOptions"
             wire:model.live="countryFilter"
             placeholder="Alle landen"
-            placeholder-value=""
+            compact
+            compact-text="landen"
+            clearable
         />
-        <x-select
+        <x-choices-offline
             :options="$this->cityOptions"
             wire:model.live="cityFilter"
             placeholder="Alle steden"
-            placeholder-value=""
+            searchable
+            clearable
         />
     </div>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-        <x-select
+        <x-choices-offline
             :options="$contactFilterOptions"
             wire:model.live="contactFilter"
+            placeholder="Alle contactinfo"
+            compact
+            compact-text="filters"
+            clearable
         />
-        <x-select
+        <x-choices-offline
             :options="$this->teamOptions"
             wire:model.live="assignedFilter"
             placeholder="Alle teamleden"
-            placeholder-value=""
+            compact
+            compact-text="teamleden"
+            clearable
         />
-        <x-select
+        <x-choices-offline
             :options="$this->brandOptions"
             wire:model.live="brandFilter"
             placeholder="Alle merken"
-            placeholder-value=""
+            compact
+            compact-text="merken"
+            clearable
         />
     </div>
 
