@@ -19,6 +19,7 @@ class TrekLocatorService
     private const BASE_SITES = [
         'BE' => 'be',
         'DE' => 'de',
+        'CH' => 'ch',
     ];
 
     /**

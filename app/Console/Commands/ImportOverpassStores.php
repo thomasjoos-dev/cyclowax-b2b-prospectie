@@ -11,7 +11,8 @@ class ImportOverpassStores extends Command
     protected $signature = 'stores:import-overpass
         {city? : De stad of regio om fietswinkels in te zoeken}
         {--all-belgium : Importeer fietswinkels uit alle grote Belgische steden}
-        {--all-germany : Importeer fietswinkels uit alle Duitse Bundesländer}';
+        {--all-germany : Importeer fietswinkels uit alle Duitse Bundesländer}
+        {--all-switzerland : Importeer fietswinkels uit heel Zwitserland}';
 
     protected $description = 'Importeer fietswinkels vanuit OpenStreetMap via de Overpass API';
 
@@ -69,10 +70,14 @@ class ImportOverpassStores extends Command
             return $this->importMultipleRegions($overpass, $importer, self::GERMAN_STATES);
         }
 
+        if ($this->option('all-switzerland')) {
+            return $this->importCountry($overpass, $importer, 'CH');
+        }
+
         $city = $this->argument('city');
 
         if (! $city) {
-            $this->error('Geef een stadsnaam op, of gebruik --all-belgium of --all-germany.');
+            $this->error('Geef een stadsnaam op, of gebruik --all-belgium, --all-germany of --all-switzerland.');
 
             return self::FAILURE;
         }
@@ -223,6 +228,49 @@ class ImportOverpassStores extends Command
 
         $this->newLine();
         $this->info("Totaal: {$totals['found']} gevonden, {$totals['created']} nieuw opgeslagen, {$totals['duplicates']} duplicaten overgeslagen, {$totals['updated']} steden aangevuld, {$totals['geocoded']} geocoded.");
+
+        return self::SUCCESS;
+    }
+
+    private function importCountry(OverpassService $overpass, StoreImportService $importer, string $isoCode): int
+    {
+        $this->info("Importeren van fietswinkels uit {$isoCode} via ISO3166-1 query...");
+        $this->newLine();
+
+        $stores = $overpass->fetchBicycleShopsInCountry($isoCode);
+
+        if (empty($stores)) {
+            $this->warn("Geen resultaten voor land \"{$isoCode}\".");
+
+            return self::FAILURE;
+        }
+
+        $this->info(count($stores).' winkels gevonden.');
+
+        // Geocode stores without city
+        $missingCount = collect($stores)->filter(fn ($s) => empty($s['city']) && ! empty($s['latitude']))->count();
+
+        $geocoded = 0;
+        if ($missingCount > 0) {
+            $this->info("Geocoding {$missingCount} winkels zonder stad...");
+
+            $geocoded = $importer->geocodeMissingCities($stores, function (int $current, int $total) {
+                if ($current % 25 === 0 || $current === $total) {
+                    $this->output->write("\r  Geocoding: {$current}/{$total}");
+                }
+            });
+
+            $this->newLine();
+            $this->info("{$geocoded} steden ingevuld via geocoding.");
+        }
+
+        $result = $importer->import($stores, fallbackCountry: $isoCode);
+
+        $this->newLine();
+        $this->table(
+            ['Land', 'Gevonden', 'Nieuw', 'Duplicaten', 'Stad ingevuld', 'Geocoded'],
+            [[$isoCode, $result['found'], $result['created'], $result['duplicates'], $result['updated'], $geocoded]]
+        );
 
         return self::SUCCESS;
     }

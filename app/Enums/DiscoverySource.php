@@ -9,6 +9,7 @@ enum DiscoverySource: string
     case BrandLocator = 'brand_locator';
     case CsvImport = 'csv_import';
     case Manual = 'manual';
+    case CyclowaxCrm = 'cyclowax_crm';
 
     public function label(): string
     {
@@ -18,6 +19,7 @@ enum DiscoverySource: string
             self::BrandLocator => 'Brand Locator',
             self::CsvImport => 'CSV Import',
             self::Manual => 'Handmatig',
+            self::CyclowaxCrm => 'Cyclowax CRM',
         };
     }
 }

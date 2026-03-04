@@ -70,6 +70,43 @@ class OverpassService
         return $this->parseElements($response->json('elements', []));
     }
 
+    /**
+     * Fetch bicycle shops from Overpass API for an entire country using ISO3166-1 code.
+     *
+     * @return array<int, array{name: string, address: string|null, city: string|null, country: string|null, postal_code: string|null, phone: string|null, website: string|null, latitude: float|null, longitude: float|null}>
+     */
+    public function fetchBicycleShopsInCountry(string $isoCode): array
+    {
+        $this->respectRateLimit(self::REGION_RATE_LIMIT_SECONDS);
+
+        $query = $this->buildCountryQuery(strtoupper($isoCode));
+
+        $response = Http::timeout(120)
+            ->asForm()
+            ->post(self::ENDPOINT, ['data' => $query]);
+
+        if ($response->failed()) {
+            Log::error('Overpass API country request failed', [
+                'iso_code' => $isoCode,
+                'status' => $response->status(),
+            ]);
+
+            return [];
+        }
+
+        return $this->parseElements($response->json('elements', []));
+    }
+
+    private function buildCountryQuery(string $isoCode): string
+    {
+        return <<<OVERPASS
+        [out:json][timeout:120];
+        area["ISO3166-1"="{$isoCode}"]->.searchArea;
+        nwr["shop"="bicycle"](area.searchArea);
+        out center tags;
+        OVERPASS;
+    }
+
     private function buildRegionQuery(string $region, int $adminLevel): string
     {
         return <<<OVERPASS

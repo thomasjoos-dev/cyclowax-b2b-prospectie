@@ -207,6 +207,7 @@ class BassoLocatorService
         return match ($code) {
             'BE' => 'BELGIUM',
             'DE' => 'GERMANY',
+            'CH' => 'SWITZERLAND',
             default => null,
         };
     }

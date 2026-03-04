@@ -17,6 +17,7 @@ class SchwalbeLocatorService
     private const COUNTRY_BOUNDS = [
         'BE' => [49.5, 51.6, 2.5, 6.5],
         'DE' => [47.2, 55.1, 5.8, 15.1],
+        'CH' => [45.8, 47.9, 5.9, 10.5],
     ];
 
     /**
@@ -28,6 +29,7 @@ class SchwalbeLocatorService
     private const POSTCODE_PATTERNS = [
         'BE' => '/^\d{4}$/',
         'DE' => '/^\d{5}$/',
+        'CH' => '/^\d{4}$/',
     ];
 
     /**

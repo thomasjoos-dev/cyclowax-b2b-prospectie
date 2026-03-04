@@ -93,6 +93,7 @@ class ImportBrandLocator extends Command
                     $this->newLine();
                 }
             }),
+            'abus' => app(AbusLocatorService::class)->fetchDealersForCountry($country),
             'basso' => app(BassoLocatorService::class)->fetchDealersForCountry($country),
             'schwalbe' => app(SchwalbeLocatorService::class)->fetchDealersForCountry($country),
             'trek' => app(TrekLocatorService::class)->fetchDealersForCountry($country, function (int $current, int $total) {
