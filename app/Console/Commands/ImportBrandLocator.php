@@ -8,6 +8,7 @@ use App\Models\Brand;
 use App\Models\Store;
 use App\Services\AbusLocatorService;
 use App\Services\BassoLocatorService;
+use App\Services\OrbeaLocatorService;
 use App\Services\SchwalbeLocatorService;
 use App\Services\SpecializedLocatorService;
 use App\Services\StoreMatchingService;
@@ -103,6 +104,7 @@ class ImportBrandLocator extends Command
                     $this->newLine();
                 }
             }),
+            'orbea' => app(OrbeaLocatorService::class)->fetchDealersForCountry($country),
             default => $this->unsupportedLiveImport($brand),
         };
     }
@@ -120,6 +122,7 @@ class ImportBrandLocator extends Command
 
         return match (mb_strtolower($brand->slug)) {
             'abus' => app(AbusLocatorService::class)->parseDealersFromFile($file),
+            'orbea' => app(OrbeaLocatorService::class)->parseDealersFromFile($file, $this->option('country')),
             default => $this->unsupportedFileImport($brand),
         };
     }
